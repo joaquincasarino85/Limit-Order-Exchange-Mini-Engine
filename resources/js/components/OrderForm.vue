@@ -117,9 +117,17 @@ const submitOrder = async () => {
         success.value = true;
         emit('order-created', response.data);
         
-        // Show toast notification
+        // Show toast notification with match status
         if (window.showToast) {
-            window.showToast('Order placed successfully!', 'success');
+            if (response.data.matched) {
+                window.showToast(
+                    `Order matched immediately! ${response.data.amount} ${response.data.symbol} @ $${response.data.price.toFixed(2)}`,
+                    'success',
+                    5000
+                );
+            } else {
+                window.showToast('Order placed successfully!', 'success');
+            }
         }
         
         // Clear success message after 3 seconds

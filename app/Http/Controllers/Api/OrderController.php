@@ -93,7 +93,10 @@ class OrderController extends Controller
                 'amount' => $validated['amount'],
             ]);
             
-            return response()->json([
+            // Refresh order to get latest status (might be FILLED if matched immediately)
+            $order->refresh();
+            
+            $response = [
                 'id' => $order->id,
                 'symbol' => $order->symbol,
                 'side' => $order->side,
@@ -101,7 +104,18 @@ class OrderController extends Controller
                 'amount' => (float) $order->amount,
                 'status' => $order->status,
                 'created_at' => $order->created_at->toISOString(),
-            ], 201);
+            ];
+            
+            // Add message if order was matched immediately
+            if ($order->status === Order::STATUS_FILLED) {
+                $response['message'] = 'Order matched immediately!';
+                $response['matched'] = true;
+            } else {
+                $response['message'] = 'Order placed successfully';
+                $response['matched'] = false;
+            }
+            
+            return response()->json($response, 201);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
