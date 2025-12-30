@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Public auth routes
+Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+
 Route::middleware('auth:sanctum')->group(function () {
     // Profile endpoint
     Route::get('/profile', [ProfileController::class, 'show']);
