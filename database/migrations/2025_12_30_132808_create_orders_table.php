@@ -11,16 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('assets', function (Blueprint $table) {
+        Schema::create('orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('symbol', 10); // BTC, ETH, etc.
-            $table->decimal('amount', 20, 8)->default(0)->comment('Available asset amount');
-            $table->decimal('locked_amount', 20, 8)->default(0)->comment('Reserved for open sell orders');
+            $table->enum('side', ['buy', 'sell']); // buy or sell
+            $table->decimal('price', 20, 2); // Limit price
+            $table->decimal('amount', 20, 8); // Order amount
+            $table->tinyInteger('status')->default(1); // 1=open, 2=filled, 3=cancelled
             $table->timestamps();
             
-            // Un usuario no puede tener duplicados del mismo símbolo
-            $table->unique(['user_id', 'symbol']);
+            // Índices para búsquedas rápidas en el matching
+            $table->index(['symbol', 'side', 'status']);
+            $table->index(['status', 'created_at']);
         });
     }
 
@@ -29,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('assets');
+        Schema::dropIfExists('orders');
     }
 };
