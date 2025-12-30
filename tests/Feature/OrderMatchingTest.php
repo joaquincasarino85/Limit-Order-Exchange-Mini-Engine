@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Asset;
 use App\Models\Order;
+use App\Models\Trade;
+use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,116 +15,302 @@ class OrderMatchingTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Test: Una orden de COMPRA debe matchear con la primera orden de VENTA válida
+     * Test: A BUY order should match with the first valid SELL order
      * 
-     * Regla de matching:
-     * - Nueva orden BUY matchea con primera SELL donde: sell.price <= buy.price
+     * Matching rule:
+     * - New BUY order matches with first SELL where: sell.price <= buy.price
      * 
-     * Escenario:
-     * - Usuario A tiene orden SELL de 0.01 BTC a $95,000
-     * - Usuario B crea orden BUY de 0.01 BTC a $100,000
-     * - Deben matchear porque $95,000 <= $100,000
+     * Scenario:
+     * - User A has SELL order: 0.01 BTC at $95,000
+     * - User B creates BUY order: 0.01 BTC at $100,000
+     * - Should match because $95,000 <= $100,000
      */
     public function test_buy_order_matches_with_sell_order_when_price_is_valid(): void
     {
-        // Usuario A: quiere vender BTC
+        $orderService = new OrderService();
+
+        // User A: wants to sell BTC
         $seller = User::factory()->create();
-        $sellerAsset = Asset::create([
+        Asset::create([
             'user_id' => $seller->id,
             'symbol' => 'BTC',
             'amount' => 0.5,
             'locked_amount' => 0,
         ]);
 
-        // Usuario B: quiere comprar BTC
+        // User B: wants to buy BTC
         $buyer = User::factory()->create(['balance' => 10000.00]);
 
-        // Crear orden de VENTA: 0.01 BTC a $95,000
-        $sellOrder = Order::create([
+        // Create SELL order: 0.01 BTC at $95,000
+        $sellOrder = $orderService->createOrder([
             'user_id' => $seller->id,
             'symbol' => 'BTC',
             'side' => 'sell',
             'price' => 95000.00,
             'amount' => 0.01,
-            'status' => 1, // open
         ]);
 
-        // Crear orden de COMPRA: 0.01 BTC a $100,000
-        // Esta orden debe matchear automáticamente con la orden de venta
-        $buyOrder = Order::create([
+        // Create BUY order: 0.01 BTC at $100,000
+        // This order should automatically match with the sell order
+        $buyOrder = $orderService->createOrder([
             'user_id' => $buyer->id,
             'symbol' => 'BTC',
             'side' => 'buy',
             'price' => 100000.00,
             'amount' => 0.01,
-            'status' => 1,
         ]);
 
-        // TODO: Aquí llamaremos al servicio de matching
-        // Por ahora, validamos que las órdenes existen
-        
-        // Después del match:
-        // - Ambas órdenes deben estar en status = 2 (filled)
-        // - El comprador debe recibir 0.01 BTC
-        // - El vendedor debe recibir USD (menos comisión)
-        // - Se debe cobrar comisión del 1.5%
-        
-        $this->assertTrue(true); // Placeholder hasta implementar matching
+        // Refresh orders from DB
+        $buyOrder->refresh();
+        $sellOrder->refresh();
+
+        // After match:
+        // - Both orders should be status = 2 (filled)
+        $this->assertEquals(Order::STATUS_FILLED, $buyOrder->status);
+        $this->assertEquals(Order::STATUS_FILLED, $sellOrder->status);
+
+        // - Buyer should receive 0.01 BTC
+        $buyerAsset = Asset::where('user_id', $buyer->id)
+            ->where('symbol', 'BTC')
+            ->first();
+        $this->assertNotNull($buyerAsset);
+        $this->assertEquals(0.01, $buyerAsset->amount);
+
+        // - Trade record should be created
+        $trade = Trade::where('buy_order_id', $buyOrder->id)
+            ->where('sell_order_id', $sellOrder->id)
+            ->first();
+        $this->assertNotNull($trade);
     }
 
     /**
-     * Test: Una orden de VENTA debe matchear con la primera orden de COMPRA válida
+     * Test: A SELL order should match with the first valid BUY order
      * 
-     * Regla de matching:
-     * - Nueva orden SELL matchea con primera BUY donde: buy.price >= sell.price
+     * Matching rule:
+     * - New SELL order matches with first BUY where: buy.price >= sell.price
      */
     public function test_sell_order_matches_with_buy_order_when_price_is_valid(): void
     {
-        // Similar al anterior pero al revés
-        $this->assertTrue(true); // Placeholder
+        $orderService = new OrderService();
+
+        // User A: wants to buy BTC
+        $buyer = User::factory()->create(['balance' => 10000.00]);
+
+        // User B: wants to sell BTC
+        $seller = User::factory()->create();
+        Asset::create([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'amount' => 0.5,
+            'locked_amount' => 0,
+        ]);
+
+        // Create BUY order: 0.01 BTC at $100,000
+        $buyOrder = $orderService->createOrder([
+            'user_id' => $buyer->id,
+            'symbol' => 'BTC',
+            'side' => 'buy',
+            'price' => 100000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Create SELL order: 0.01 BTC at $95,000
+        // This order should automatically match with the buy order
+        $sellOrder = $orderService->createOrder([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'side' => 'sell',
+            'price' => 95000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Refresh orders from DB
+        $buyOrder->refresh();
+        $sellOrder->refresh();
+
+        // Both orders should be filled
+        $this->assertEquals(Order::STATUS_FILLED, $buyOrder->status);
+        $this->assertEquals(Order::STATUS_FILLED, $sellOrder->status);
     }
 
     /**
-     * Test: NO debe hacer match si los precios no coinciden
+     * Test: Orders should NOT match when prices don't overlap
      * 
-     * Escenario:
-     * - Orden SELL: 0.01 BTC a $100,000
-     * - Orden BUY: 0.01 BTC a $95,000
-     * - NO deben matchear porque $100,000 > $95,000
+     * Scenario:
+     * - SELL order: 0.01 BTC at $100,000
+     * - BUY order: 0.01 BTC at $95,000
+     * - Should NOT match because $100,000 > $95,000
      */
     public function test_orders_do_not_match_when_prices_dont_overlap(): void
     {
-        $this->assertTrue(true); // Placeholder
+        $orderService = new OrderService();
+
+        // User A: wants to sell BTC at high price
+        $seller = User::factory()->create();
+        Asset::create([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'amount' => 0.5,
+            'locked_amount' => 0,
+        ]);
+
+        // User B: wants to buy BTC at low price
+        $buyer = User::factory()->create(['balance' => 10000.00]);
+
+        // Create SELL order: 0.01 BTC at $100,000
+        $sellOrder = $orderService->createOrder([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'side' => 'sell',
+            'price' => 100000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Create BUY order: 0.01 BTC at $95,000
+        // Should NOT match because buy price < sell price
+        $buyOrder = $orderService->createOrder([
+            'user_id' => $buyer->id,
+            'symbol' => 'BTC',
+            'side' => 'buy',
+            'price' => 95000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Refresh orders from DB
+        $buyOrder->refresh();
+        $sellOrder->refresh();
+
+        // Both orders should remain open (not matched)
+        $this->assertEquals(Order::STATUS_OPEN, $buyOrder->status);
+        $this->assertEquals(Order::STATUS_OPEN, $sellOrder->status);
+
+        // No trade should be created
+        $trade = Trade::where('buy_order_id', $buyOrder->id)
+            ->where('sell_order_id', $sellOrder->id)
+            ->first();
+        $this->assertNull($trade);
     }
 
     /**
-     * Test: Después del match, los balances deben actualizarse correctamente
+     * Test: After match, balances should update correctly
      * 
-     * Escenario: Match de 0.01 BTC a $95,000
-     * - Comprador: pierde $950 (más comisión), gana 0.01 BTC
-     * - Vendedor: pierde 0.01 BTC, gana $950 (menos comisión si aplica)
-     * - Comisión: 1.5% de $950 = $14.25
+     * Scenario: Match of 0.01 BTC at $95,000
+     * - Buyer: loses $950 + commission, gains 0.01 BTC
+     * - Seller: loses 0.01 BTC, gains $950
+     * - Commission: 1.5% of $950 = $14.25
      */
     public function test_balances_update_correctly_after_match(): void
     {
-        $this->assertTrue(true); // Placeholder
+        $orderService = new OrderService();
+
+        // User A: wants to sell BTC
+        $seller = User::factory()->create(['balance' => 0]);
+        Asset::create([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'amount' => 1.0,
+            'locked_amount' => 0,
+        ]);
+
+        // User B: wants to buy BTC
+        $buyer = User::factory()->create(['balance' => 10000.00]);
+
+        // Create SELL order: 0.01 BTC at $95,000
+        $sellOrder = $orderService->createOrder([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'side' => 'sell',
+            'price' => 95000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Create BUY order: 0.01 BTC at $100,000
+        // This will match at $95,000 (sell order price)
+        $buyOrder = $orderService->createOrder([
+            'user_id' => $buyer->id,
+            'symbol' => 'BTC',
+            'side' => 'buy',
+            'price' => 100000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Refresh users from DB
+        $buyer->refresh();
+        $seller->refresh();
+
+        // Buyer: started with $10,000
+        // Locked: $1,000 (100,000 * 0.01)
+        // Paid: $950 (95,000 * 0.01)
+        // Commission: $14.25
+        // Difference returned: $50
+        // Final balance: $10,000 - $1,000 + $50 - $14.25 = $9,035.75
+        $expectedBuyerBalance = 10000.00 - 1000.00 + 50.00 - 14.25;
+        $this->assertEquals($expectedBuyerBalance, $buyer->balance);
+
+        // Seller: started with $0, gains $950
+        $this->assertEquals(950.00, $seller->balance);
+
+        // Buyer should have 0.01 BTC
+        $buyerAsset = Asset::where('user_id', $buyer->id)
+            ->where('symbol', 'BTC')
+            ->first();
+        $this->assertNotNull($buyerAsset);
+        $this->assertEquals(0.01, $buyerAsset->amount);
     }
 
     /**
-     * Test: La comisión del 1.5% se calcula correctamente
+     * Test: Commission of 1.5% is calculated correctly
      * 
-     * Ejemplo del requerimiento:
-     * - 0.01 BTC @ $95,000 = volumen de $950
-     * - Comisión: $950 * 0.015 = $14.25
+     * Example from requirements:
+     * - 0.01 BTC @ $95,000 = volume of $950
+     * - Commission: $950 * 0.015 = $14.25
      */
     public function test_commission_is_calculated_correctly(): void
     {
-        $volume = 950.00; // 0.01 BTC * $95,000
-        $commissionRate = 0.015; // 1.5%
-        $expectedCommission = 14.25;
+        $orderService = new OrderService();
 
-        $calculatedCommission = $volume * $commissionRate;
+        // User A: wants to sell BTC
+        $seller = User::factory()->create();
+        Asset::create([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'amount' => 1.0,
+            'locked_amount' => 0,
+        ]);
 
-        $this->assertEquals($expectedCommission, $calculatedCommission);
+        // User B: wants to buy BTC
+        $buyer = User::factory()->create(['balance' => 10000.00]);
+
+        // Create SELL order: 0.01 BTC at $95,000
+        $sellOrder = $orderService->createOrder([
+            'user_id' => $seller->id,
+            'symbol' => 'BTC',
+            'side' => 'sell',
+            'price' => 95000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Create BUY order: 0.01 BTC at $100,000
+        $buyOrder = $orderService->createOrder([
+            'user_id' => $buyer->id,
+            'symbol' => 'BTC',
+            'side' => 'buy',
+            'price' => 100000.00,
+            'amount' => 0.01,
+        ]);
+
+        // Check trade record
+        $trade = Trade::where('buy_order_id', $buyOrder->id)
+            ->where('sell_order_id', $sellOrder->id)
+            ->first();
+
+        $this->assertNotNull($trade);
+        
+        // Volume: 0.01 BTC * $95,000 = $950
+        $expectedVolume = 950.00;
+        $expectedCommission = 14.25; // $950 * 0.015
+
+        $this->assertEquals($expectedVolume, $trade->price * $trade->amount);
+        $this->assertEquals($expectedCommission, $trade->commission);
     }
 }
