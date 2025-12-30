@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\OrderMatched;
 use App\Models\Order;
 use App\Models\Asset;
 use App\Models\User;
@@ -295,7 +296,7 @@ class OrderService
         $sellOrder->save();
 
         // Create trade record
-        Trade::create([
+        $trade = Trade::create([
             'buy_order_id' => $buyOrder->id,
             'sell_order_id' => $sellOrder->id,
             'symbol' => $buyOrder->symbol,
@@ -303,6 +304,13 @@ class OrderService
             'amount' => $amount,
             'commission' => $commission,
         ]);
+
+        // Load relationships for broadcasting
+        $trade->load(['buyOrder', 'sellOrder']);
+
+        // Broadcast the OrderMatched event to both users
+        // This will send real-time updates via Pusher
+        event(new OrderMatched($trade));
     }
 
     /**
