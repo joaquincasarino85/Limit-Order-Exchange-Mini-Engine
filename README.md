@@ -1,59 +1,263 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Limit-Order Exchange Mini Engine
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A full-stack limit order exchange system built with Laravel API and Vue.js frontend. This mini trading engine allows users to place buy/sell orders for cryptocurrencies (BTC/ETH) with automatic order matching, real-time updates via Pusher, and commission handling.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- ✅ Limit order placement and cancellation
+- ✅ Automatic order matching engine
+- ✅ Real-time order updates via Pusher broadcasting
+- ✅ Balance and asset management with race condition safety
+- ✅ 1.5% commission on matched trades
+- ✅ Orderbook visualization
+- ✅ Wallet overview with USD and crypto balances
+- ✅ Full test coverage with TDD approach
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Backend**: Laravel 12 (latest stable)
+- **Frontend**: Vue.js 3 with Composition API + Tailwind CSS
+- **Database**: MySQL
+- **Real-time**: Pusher via Laravel Broadcasting
+- **Authentication**: Laravel Sanctum
 
-## Learning Laravel
+## Prerequisites
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- PHP >= 8.2
+- Composer
+- Node.js >= 18
+- Docker Desktop (for Sail)
+- MySQL (or use Docker)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Installation
 
-## Laravel Sponsors
+### 1. Clone the repository
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+git clone <your-repo-url>
+cd limitOrderExchangeMiniEngine
+```
 
-### Premium Partners
+### 2. Install PHP dependencies
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+composer install
+```
 
-## Contributing
+### 3. Install Node dependencies
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+npm install
+```
 
-## Code of Conduct
+### 4. Configure environment
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Copy the `.env.example` file to `.env`:
 
-## Security Vulnerabilities
+```bash
+cp .env.example .env
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Generate application key:
+
+```bash
+php artisan key:generate
+```
+
+### 5. Configure Database
+
+Update your `.env` file with database credentials:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=limit_order_exchange
+DB_USERNAME=root
+DB_PASSWORD=your_password
+```
+
+### 6. Configure Pusher (Optional for development)
+
+For real-time features, configure Pusher in `.env`:
+
+```env
+BROADCAST_DRIVER=pusher
+PUSHER_APP_ID=your_app_id
+PUSHER_APP_KEY=your_app_key
+PUSHER_APP_SECRET=your_app_secret
+PUSHER_APP_CLUSTER=mt1
+```
+
+**Note**: For development/testing without Pusher, you can use:
+```env
+BROADCAST_DRIVER=log
+```
+
+### 7. Run migrations
+
+```bash
+php artisan migrate
+```
+
+### 8. Build frontend assets
+
+```bash
+npm run build
+```
+
+Or for development with hot reload:
+
+```bash
+npm run dev
+```
+
+## Running with Docker (Laravel Sail)
+
+### 1. Start Docker containers
+
+```bash
+./vendor/bin/sail up -d
+```
+
+### 2. Run migrations
+
+```bash
+./vendor/bin/sail artisan migrate
+```
+
+### 3. Access phpMyAdmin
+
+- URL: http://localhost:8080
+- Username: `sail` (or `root`)
+- Password: `password`
+- Server: `mysql`
+
+### 4. Access the application
+
+- Frontend: http://localhost
+- API: http://localhost/api
+
+## Running Tests
+
+```bash
+# Run all tests
+php artisan test
+
+# Run specific test suite
+php artisan test --filter OrderMatchingTest
+php artisan test --filter OrderCreationTest
+php artisan test --filter ProfileTest
+```
+
+## API Endpoints
+
+All endpoints require authentication via Bearer token (Laravel Sanctum).
+
+### Authentication
+
+- `POST /api/login` - Login and get API token
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "password"
+  }
+  ```
+
+### Profile
+
+- `GET /api/profile` - Get user balance and assets
+
+### Orders
+
+- `GET /api/orders?symbol=BTC` - Get all open orders (orderbook)
+- `POST /api/orders` - Create a new limit order
+  ```json
+  {
+    "symbol": "BTC",
+    "side": "buy",
+    "price": 100000.00,
+    "amount": 0.01
+  }
+  ```
+- `POST /api/orders/{id}/cancel` - Cancel an open order
+
+## Project Structure
+
+```
+├── app/
+│   ├── Events/
+│   │   └── OrderMatched.php          # Broadcasting event
+│   ├── Http/
+│   │   └── Controllers/
+│   │       └── Api/                   # API controllers
+│   ├── Models/                        # Eloquent models
+│   └── Services/
+│       └── OrderService.php          # Order matching logic
+├── database/
+│   └── migrations/                   # Database migrations
+├── resources/
+│   ├── js/
+│   │   ├── components/                # Vue components
+│   │   ├── utils/                    # Utilities (eventBus)
+│   │   ├── App.vue                   # Main Vue app
+│   │   └── app.js                    # Entry point
+│   └── views/
+│       └── app.blade.php             # Main Blade template
+├── routes/
+│   ├── api.php                       # API routes
+│   ├── channels.php                  # Broadcasting channels
+│   └── web.php                       # Web routes
+└── tests/
+    └── Feature/                      # Feature tests
+```
+
+## Key Features Explained
+
+### Order Matching
+
+Orders are matched immediately when created:
+- **BUY orders** match with first **SELL** order where `sell.price <= buy.price`
+- **SELL orders** match with first **BUY** order where `buy.price >= sell.price`
+- Only full matches (same amount) are executed
+- Matching happens atomically within database transactions
+
+### Real-time Updates
+
+When an order is matched:
+1. `OrderMatched` event is broadcast via Pusher
+2. Both users (buyer and seller) receive the event on their private channels
+3. Frontend automatically updates balances, assets, and order lists
+
+### Security Features
+
+- **Race condition safety**: Uses `lockForUpdate()` for pessimistic locking
+- **Atomic transactions**: All order operations are wrapped in DB transactions
+- **Balance validation**: Prevents negative balances
+- **Asset validation**: Prevents selling more than available
+
+## Testing
+
+The project includes comprehensive tests:
+
+- **Model tests**: User relationships and validations
+- **Order creation tests**: Validation and fund locking
+- **Matching tests**: Order matching logic and balance updates
+- **API tests**: Endpoint functionality and authentication
+
+Run tests with:
+
+```bash
+php artisan test
+```
+
+## Development Notes
+
+- The matching engine executes immediately when orders are created (no background jobs)
+- Commission (1.5%) is deducted from the buyer
+- Orders can only be cancelled if they're still open
+- All prices and amounts use decimal precision (20,8 for amounts, 20,2 for prices)
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is part of a technical assessment.

@@ -53,8 +53,14 @@
                 />
             </div>
 
-            <div v-if="form.price && form.amount" class="text-sm text-gray-600">
-                <p>Total: ${{ (form.price * form.amount).toFixed(2) }}</p>
+            <div v-if="form.price && form.amount" class="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                <div class="space-y-1">
+                    <p><strong>Volume:</strong> ${{ (form.price * form.amount).toFixed(2) }}</p>
+                    <p><strong>Commission (1.5%):</strong> ${{ ((form.price * form.amount) * 0.015).toFixed(2) }}</p>
+                    <p v-if="form.side === 'buy'" class="text-red-600">
+                        <strong>Total to pay:</strong> ${{ ((form.price * form.amount) * 1.015).toFixed(2) }}
+                    </p>
+                </div>
             </div>
 
             <button
@@ -111,12 +117,20 @@ const submitOrder = async () => {
         success.value = true;
         emit('order-created', response.data);
         
+        // Show toast notification
+        if (window.showToast) {
+            window.showToast('Order placed successfully!', 'success');
+        }
+        
         // Clear success message after 3 seconds
         setTimeout(() => {
             success.value = false;
         }, 3000);
     } catch (err) {
         error.value = err.response?.data?.message || 'Failed to place order';
+        if (window.showToast) {
+            window.showToast(error.value, 'error');
+        }
     } finally {
         loading.value = false;
     }

@@ -34,17 +34,51 @@
 
         <!-- Orders List -->
         <div class="bg-white shadow-md rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">Orders</h2>
-                <select
-                    v-model="selectedSymbol"
-                    @change="loadOrders"
-                    class="px-3 py-1 border border-gray-300 rounded-md text-sm"
-                >
-                    <option value="">All Symbols</option>
-                    <option value="BTC">BTC</option>
-                    <option value="ETH">ETH</option>
-                </select>
+            <div class="mb-4">
+                <h2 class="text-xl font-bold mb-4">Orders</h2>
+                
+                <!-- Filters -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Symbol</label>
+                        <select
+                            v-model="filters.symbol"
+                            @change="applyFilters"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                            <option value="">All Symbols</option>
+                            <option value="BTC">BTC</option>
+                            <option value="ETH">ETH</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Side</label>
+                        <select
+                            v-model="filters.side"
+                            @change="applyFilters"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                            <option value="">All Sides</option>
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Status</label>
+                        <select
+                            v-model="filters.status"
+                            @change="applyFilters"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        >
+                            <option value="">All Status</option>
+                            <option value="1">Open</option>
+                            <option value="2">Filled</option>
+                            <option value="3">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <div v-if="loading" class="text-center py-4">
@@ -57,7 +91,7 @@
 
             <div v-else class="space-y-2">
                 <div
-                    v-for="order in orders"
+                    v-for="order in filteredOrders"
                     :key="order.id"
                     class="flex justify-between items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
                 >
@@ -171,7 +205,35 @@ const selectedSymbol = ref('');
 const orderbookSymbol = ref('BTC');
 const loading = ref(false);
 const orderbookLoading = ref(false);
+const filters = ref({
+    symbol: '',
+    side: '',
+    status: '',
+});
 let echo = null;
+
+// Filtered orders based on filters
+const filteredOrders = computed(() => {
+    let filtered = [...orders.value];
+    
+    if (filters.value.symbol) {
+        filtered = filtered.filter(order => order.symbol === filters.value.symbol);
+    }
+    
+    if (filters.value.side) {
+        filtered = filtered.filter(order => order.side === filters.value.side);
+    }
+    
+    if (filters.value.status) {
+        filtered = filtered.filter(order => order.status === parseInt(filters.value.status));
+    }
+    
+    return filtered;
+});
+
+const applyFilters = () => {
+    // Filters are applied via computed property, no need to reload
+};
 
 const buyOrders = computed(() => {
     return orderbook.value
@@ -215,7 +277,12 @@ const loadProfile = async () => {
 const loadOrders = async () => {
     loading.value = true;
     try {
-        const params = selectedSymbol.value ? { symbol: selectedSymbol.value } : {};
+        const params = {
+            my_orders: true, // Get user's own orders
+        };
+        if (selectedSymbol.value) {
+            params.symbol = selectedSymbol.value;
+        }
         const response = await axios.get('/api/orders', { params });
         orders.value = response.data;
     } catch (error) {
@@ -249,8 +316,17 @@ const cancelOrder = async (orderId) => {
         await loadOrders();
         await loadOrderbook();
         await loadProfile();
+        
+        if (window.showToast) {
+            window.showToast('Order cancelled successfully', 'success');
+        }
     } catch (error) {
-        alert(error.response?.data?.message || 'Failed to cancel order');
+        const message = error.response?.data?.message || 'Failed to cancel order';
+        if (window.showToast) {
+            window.showToast(message, 'error');
+        } else {
+            alert(message);
+        }
     }
 };
 
@@ -286,15 +362,24 @@ const setupPusher = () => {
     });
 
     // Listen for order matched events on user's private channel
-    echo.private(`user.${props.user.id}`)
-        .listen('.order.matched', (event) => {
-            console.log('Order matched:', event);
-            
-            // Refresh all data
-            loadProfile();
-            loadOrders();
-            loadOrderbook();
-        });
+        echo.private(`user.${props.user.id}`)
+            .listen('.order.matched', (event) => {
+                console.log('Order matched:', event);
+                
+                // Show toast notification
+                if (window.showToast) {
+                    window.showToast(
+                        `Order matched! ${event.trade.amount} ${event.trade.symbol} @ $${event.trade.price.toFixed(2)}`,
+                        'success',
+                        5000
+                    );
+                }
+                
+                // Refresh all data
+                loadProfile();
+                loadOrders();
+                loadOrderbook();
+            });
 };
 
 onMounted(async () => {

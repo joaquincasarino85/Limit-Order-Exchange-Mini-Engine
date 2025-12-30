@@ -61,6 +61,9 @@
                 <OrdersWallet :user="user" />
             </div>
         </div>
+
+        <!-- Toast Notifications -->
+        <Toast />
     </div>
 </template>
 
@@ -69,6 +72,7 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import OrderForm from './components/OrderForm.vue';
 import OrdersWallet from './components/OrdersWallet.vue';
+import Toast from './components/Toast.vue';
 import { on } from './utils/eventBus.js';
 
 const user = ref(null);

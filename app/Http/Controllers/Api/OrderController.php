@@ -20,7 +20,10 @@ class OrderController extends Controller
     }
 
     /**
-     * Get all open orders for the orderbook.
+     * Get orders.
+     * 
+     * If 'my_orders' parameter is true, returns authenticated user's orders (all statuses).
+     * Otherwise, returns all open orders for the orderbook.
      * 
      * @param Request $request
      * @return JsonResponse
@@ -28,13 +31,25 @@ class OrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $symbol = $request->query('symbol');
+        $myOrders = $request->query('my_orders', false);
         
-        $query = Order::where('status', Order::STATUS_OPEN)
-            ->orderBy('price', 'asc')
-            ->orderBy('created_at', 'asc');
-        
-        if ($symbol) {
-            $query->where('symbol', $symbol);
+        if ($myOrders) {
+            // Return user's own orders (all statuses)
+            $query = Order::where('user_id', $request->user()->id)
+                ->orderBy('created_at', 'desc');
+            
+            if ($symbol) {
+                $query->where('symbol', $symbol);
+            }
+        } else {
+            // Return all open orders for orderbook
+            $query = Order::where('status', Order::STATUS_OPEN)
+                ->orderBy('price', 'asc')
+                ->orderBy('created_at', 'asc');
+            
+            if ($symbol) {
+                $query->where('symbol', $symbol);
+            }
         }
         
         $orders = $query->get()->map(function ($order) {
